@@ -1,11 +1,8 @@
 streamlit
-st-gsheets-connection
-docxtpl
-docx2pdf
-num2words
 pandas
-pywin32
-gspread
-google-auth
-PyMuPDF
+supabase
+docxtpl
+num2words
 plotly
+requests
+PyMuPDF
