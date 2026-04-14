@@ -1,0 +1,15 @@
+Untuk LSUHK:
+pks_lsuhk_gabungan.docx (Jika pilih PPIU & PIHK)
+pks_lsuhk_ppiu.docx (Jika pilih PPIU saja)
+pks_lsuhk_pihk.docx (Jika pilih PIHK saja)
+qa_lsuhk.docx
+
+Untuk LSPr:
+pks_lspr_hotel.docx
+pks_lspr_restoran.docx
+pks_lspr_bpw.docx
+qa_lspr.docx
+
+Untuk Non KAN:
+pks_non_kan.docx
+qa_non_kan.docx
