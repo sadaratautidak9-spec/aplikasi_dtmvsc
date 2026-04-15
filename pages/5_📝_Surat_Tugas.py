@@ -16,7 +16,7 @@ SUPABASE_URL = "https://ehfpmlwmdnjtxrfqdgkc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoZnBtbHdtZG5qdHhyZnFkZ2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDc1NjMsImV4cCI6MjA5MDA4MzU2M30.LPiPaAIm2MhuywLnmSTegWO0-1gcPuVww8abFhTAin8"
 
 # MASUKKAN URL WEBHOOK n8n ANDA DI SINI
-URL_WEBHOOK_N8N = "http://localhost:5678/webhook-test/MASUKKAN-ID-WEBHOOK-ANDA-DISINI"
+N8N_WEBHOOK_URL = "https://n8n-ihbsb8xa9qan.jkt4.sumopod.my.id/webhook/0efd14de-28cc-4582-ac29-dc4cf98bcfda"
 
 @st.cache_resource
 def init_connection():
