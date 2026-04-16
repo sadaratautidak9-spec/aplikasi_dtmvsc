@@ -296,14 +296,14 @@ with tab1:
                             "no_kontrak": prev_no_kontrak, 
                             "no_qa": prev_no_qa,
                             "nama_klien": nama_klien, 
-                            "nama_brand": nama_brand, # Tambahan data ke Supabase opsional
-                            "kategori_brand": kategori_brand, # Tambahan data ke Supabase opsional
+                            "nama_brand": nama_brand, 
+                            "kategori_brand": kategori_brand, 
                             "marketing": marketing,
                             "no_wa_marketing": format_wa_number(tlp_marketing), 
                             "no_wa_klien": format_wa_number(tlp_klien),
                             "email_klien": email_klien, 
                             "skema": skema, 
-                            "ruang_lingkup": scope_pendek, # <--- DISINI DIKIRIM PENDEK!
+                            "ruang_lingkup": scope_pendek, 
                             "harga": harga_formatted,
                             "alamat_klien": alamat_klien, 
                             "tanggal_dokumen": tanggal_indo_rapi, 
@@ -318,7 +318,7 @@ with tab1:
                             response = requests.post(N8N_WEBHOOK_URL, data=payload_data, files=files_to_send)
                             if response.status_code == 200:
                                 st.success("🚀 Data dan File Word berhasil dikirim ke n8n!")
-                                get_next_contract_number.clear()
+                                # BARIS PENYEBAB ERROR TELAH DIHAPUS DI SINI! (get_next_contract_number.clear())
                             else:
                                 st.warning(f"⚠️ Gagal mengirim ke n8n. Status Code: {response.status_code}")
                     except Exception as e_n8n:
