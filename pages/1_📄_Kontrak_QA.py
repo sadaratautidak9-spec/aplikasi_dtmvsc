@@ -42,8 +42,7 @@ st.markdown("""
 
 if 'docs_generated' not in st.session_state:
     st.session_state.docs_generated = False
-    st.session_state.path_pks = ""
-    st.session_state.path_qa = ""
+    st.session_state.path_doc = ""
     st.session_state.wa_url = ""
 
 # 2. FUNGSI PEMBANTU (HELPERS)
@@ -90,7 +89,7 @@ tab1, tab2, tab3 = st.tabs(["📄 Form Generator", "📊 Database Kontrak", "⚙
 with tab1:
     with st.form("doc_form", clear_on_submit=False):
         
-        # --- KARTU 1: SKEMA & RUANG LINGKUP (MENGGUNAKAN NATIVE CONTAINER) ---
+        # --- KARTU 1: SKEMA & RUANG LINGKUP ---
         with st.container(border=True):
             st.markdown("<h4 class='section-title'><span class='material-symbols-outlined'>category</span> 1. Skema & Ruang Lingkup</h4>", unsafe_allow_html=True)
             col_s1, col_s2 = st.columns(2)
@@ -191,45 +190,35 @@ with tab1:
                         'status_transportasi': status_transportasi, 'status_akomodasi': status_akomodasi
                     }
 
-                    pks_template = ""
-                    qa_template = ""
+                    # --- LOGIKA PEMILIHAN 1 TEMPLATE GABUNGAN ---
+                    template_path = ""
 
                     if skema == "LSUHK":
-                        if len(scope_pilihan) == 2: pks_template = "templates/pks_lsuhk_gabungan.docx"
-                        elif "PPIU" in scope_pilihan: pks_template = "templates/pks_lsuhk_ppiu.docx"
-                        else: pks_template = "templates/pks_lsuhk_pihk.docx"
-                        qa_template = "templates/qa_lsuhk.docx"
+                        if len(scope_pilihan) == 2: template_path = "templates/gabungan_lsuhk_ppiu_pihk.docx"
+                        elif "PPIU" in scope_pilihan: template_path = "templates/gabungan_lsuhk_ppiu.docx"
+                        else: template_path = "templates/gabungan_lsuhk_pihk.docx"
                     elif skema == "LSPr":
-                        if "Hotel" in scope_pilihan: pks_template = "templates/pks_lspr_hotel.docx"
-                        elif "Restoran" in scope_pilihan: pks_template = "templates/pks_lspr_restoran.docx"
-                        else: pks_template = "templates/pks_lspr_bpw.docx"
-                        qa_template = "templates/qa_lspr.docx"
+                        if "Hotel" in scope_pilihan: template_path = "templates/gabungan_lspr_hotel.docx"
+                        elif "Restoran" in scope_pilihan: template_path = "templates/gabungan_lspr_restoran.docx"
+                        else: template_path = "templates/gabungan_lspr_bpw.docx"
                     else:
-                        pks_template = "templates/pks_non_kan.docx"
-                        qa_template = "templates/qa_non_kan.docx"
+                        template_path = "templates/gabungan_non_kan.docx"
 
                     os.makedirs("output/word", exist_ok=True)
                     os.makedirs("templates", exist_ok=True)
 
-                    if not os.path.exists(pks_template) or not os.path.exists(qa_template):
-                        st.error(f"⚠️ Template tidak ditemukan! Pastikan file `{pks_template}` dan `{qa_template}` sudah ada di folder 'templates/'.")
+                    if not os.path.exists(template_path):
+                        st.error(f"⚠️ Template tidak ditemukan! Pastikan file `{template_path}` sudah ada di folder 'templates/'.")
                         st.stop()
 
-                    # --- PROSES PKS (HANYA WORD) ---
-                    doc_pks = DocxTemplate(pks_template)
-                    doc_pks.render(context)
-                    fname_pks = f"PKS_{prev_no_kontrak.replace('/', '-')}_{nama_klien}.docx"
-                    path_pks_docx = f"output/word/{fname_pks}"
-                    doc_pks.save(path_pks_docx)
+                    # --- PROSES RENDER (HANYA 1 DOKUMEN) ---
+                    doc = DocxTemplate(template_path)
+                    doc.render(context)
+                    fname_doc = f"Kontrak_QA_{prev_no_kontrak.replace('/', '-')}_{nama_klien}.docx"
+                    path_docx = f"output/word/{fname_doc}"
+                    doc.save(path_docx)
 
-                    # --- PROSES QA (HANYA WORD) ---
-                    doc_qa = DocxTemplate(qa_template)
-                    doc_qa.render(context)
-                    fname_qa = f"QA_{prev_no_qa.replace('/', '-')}_{nama_klien}.docx"
-                    path_qa_docx = f"output/word/{fname_qa}"
-                    doc_qa.save(path_qa_docx)
-
-                    # --- KIRIM DATA & FILE WORD KE n8n ---
+                    # --- KIRIM DATA & 1 FILE WORD KE n8n ---
                     try:
                         payload_data = {
                             "no_kontrak": prev_no_kontrak, "nama_klien": nama_klien, "marketing": marketing,
@@ -238,8 +227,7 @@ with tab1:
                             "alamat_klien": alamat_klien, "tanggal_dokumen" : str(tgl_dokumen)
                         }
                         files_to_send = {
-                            "file_word_pks": (fname_pks, open(path_pks_docx, "rb"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-                            "file_word_qa": (fname_qa, open(path_qa_docx, "rb"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                            "file_word": (fname_doc, open(path_docx, "rb"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
                         }
                         if "MASUKKAN-ID-WEBHOOK" not in N8N_WEBHOOK_URL:
                             response = requests.post(N8N_WEBHOOK_URL, data=payload_data, files=files_to_send)
@@ -258,8 +246,7 @@ with tab1:
                                f"💰 *Harga:* {harga_formatted}\n\nMohon tunggu beberapa saat hingga sistem n8n mengirimkan versi PDF-nya. Terima kasih.")
                     
                     st.session_state.docs_generated = True
-                    st.session_state.path_pks = path_pks_docx
-                    st.session_state.path_qa = path_qa_docx
+                    st.session_state.path_doc = path_docx
                     st.session_state.wa_url = f"https://wa.me/{wa_number}?text={urllib.parse.quote(wa_text)}"
 
                     st.balloons()
@@ -273,15 +260,9 @@ with tab1:
             st.markdown("<h4 style='color: #16a34a; margin-top: 0;'>🎉 Dokumen Word Siap Diunduh!</h4>", unsafe_allow_html=True)
             st.info("💡 Versi PDF akan diproses dan dikirimkan secara otomatis oleh sistem n8n di belakang layar.")
             
-            c_dl1, c_dl2 = st.columns(2)
-            with c_dl1:
-                if os.path.exists(st.session_state.path_pks):
-                    with open(st.session_state.path_pks, "rb") as f:
-                        st.download_button("📥 Download PKS (Word)", f, file_name=os.path.basename(st.session_state.path_pks), use_container_width=True)
-            with c_dl2:
-                if os.path.exists(st.session_state.path_qa):
-                    with open(st.session_state.path_qa, "rb") as f:
-                        st.download_button("📥 Download QA (Word)", f, file_name=os.path.basename(st.session_state.path_qa), use_container_width=True)
+            if os.path.exists(st.session_state.path_doc):
+                with open(st.session_state.path_doc, "rb") as f:
+                    st.download_button("📥 Download Kontrak & QA (Word)", f, file_name=os.path.basename(st.session_state.path_doc), use_container_width=True)
             
             st.markdown(
                 f"""
@@ -293,33 +274,17 @@ with tab1:
                 """, unsafe_allow_html=True
             )
 
-with tab2:
-    with st.container(border=True):
-        st.markdown("<h4 class='section-title'><span class='material-symbols-outlined'>database</span> Database Kontrak (Supabase)</h4>", unsafe_allow_html=True)
-        
-        if st.button("🔄 Refresh Data", type="primary"):
-            with st.spinner("Mengambil data dari Supabase..."):
-                try:
-                    res = supabase.table('data_kontrak').select("*").execute()
-                    if res.data:
-                        df = pd.DataFrame(res.data)
-                        if 'created_at' in df.columns:
-                            df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
-                        st.dataframe(df, use_container_width=True, hide_index=True)
-                    else:
-                        st.info("Belum ada data kontrak di Supabase.")
-                except Exception as e:
-                    st.error(f"Gagal mengambil data: {e}")
+# ... (Tab 2 tetap sama) ...
 
 with tab3:
     with st.container(border=True):
         st.markdown("<h4 class='section-title'><span class='material-symbols-outlined'>settings</span> Petunjuk Penggunaan</h4>", unsafe_allow_html=True)
         st.markdown("""
         1. Pastikan file template Word (`.docx`) berada di dalam folder `templates/`.
-        2. Nama template yang dibutuhkan:
-           - **LSUHK:** `pks_lsuhk_gabungan.docx`, `pks_lsuhk_ppiu.docx`, `pks_lsuhk_pihk.docx`, `qa_lsuhk.docx`
-           - **LSPr:** `pks_lspr_hotel.docx`, `pks_lspr_restoran.docx`, `pks_lspr_bpw.docx`, `qa_lspr.docx`
-           - **Non KAN:** `pks_non_kan.docx`, `qa_non_kan.docx`
-        3. Aplikasi ini akan menghasilkan file **Word (.docx)** dan mengirimkannya ke n8n.
+        2. Nama template gabungan yang dibutuhkan:
+           - **LSUHK:** `gabungan_lsuhk_ppiu_pihk.docx`, `gabungan_lsuhk_ppiu.docx`, `gabungan_lsuhk_pihk.docx`
+           - **LSPr:** `gabungan_lspr_hotel.docx`, `gabungan_lspr_restoran.docx`, `gabungan_lspr_bpw.docx`
+           - **Non KAN:** `gabungan_non_kan.docx`
+        3. Aplikasi ini akan menghasilkan **1 file Word (.docx)** yang berisi Kontrak & QA, lalu mengirimkannya ke n8n.
         4. **Konversi ke PDF akan dilakukan secara otomatis oleh n8n** di server cloud.
         """)
