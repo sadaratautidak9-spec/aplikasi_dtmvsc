@@ -91,10 +91,8 @@ st.markdown("<br>", unsafe_allow_html=True)
 tab1, tab2, tab3 = st.tabs(["📄 Form Generator", "📊 Database Kontrak", "⚙️ Pengaturan"])
 
 with tab1:
-    with st.form("doc_form", clear_on_submit=False):
-        
-        with tab1:
-    # --- KARTU 1 (DIKELUARKAN DARI FORM AGAR INTERAKTIF) ---
+    
+    # --- KARTU 1: SKEMA & RUANG LINGKUP (Di luar form agar interaktif!) ---
     with st.container(border=True):
         st.markdown("<h4 class='section-title'><span class='material-symbols-outlined'>category</span> 1. Skema & Ruang Lingkup</h4>", unsafe_allow_html=True)
         col_s1, col_s2 = st.columns(2)
@@ -108,7 +106,7 @@ with tab1:
             else:
                 scope_pilihan = [st.selectbox("Ruang Lingkup (Non KAN)", ["Hotel Bintang 1", "Hotel Bintang 2", "Hotel Bintang 3", "Hotel Bintang 4", "Hotel Bintang 5"])]
 
-    # --- FORM DIMULAI DARI KARTU 2 ---
+    # --- KARTU 2 & 3: DIMULAI DI DALAM FORM ---
     with st.form("doc_form", clear_on_submit=False):
         
         # --- KARTU 2: IDENTITAS KLIEN ---
@@ -125,9 +123,6 @@ with tab1:
                 jabatan_raw = st.text_input("Jabatan Penandatangan")
                 lokasi = st.text_input("Lokasi Penandatanganan", "Jakarta")
                 tgl_dokumen = st.date_input("Tanggal Dokumen", datetime.now())
-
-        # --- KARTU 3: FINANSIAL & MARKETING ---
-# ... (Biarkan sisa kode di bawahnya tetap sama seperti sebelumnya) ...
 
         # --- KARTU 3: FINANSIAL & MARKETING ---
         with st.container(border=True):
@@ -148,10 +143,10 @@ with tab1:
             with c5: status_transportasi = st.selectbox("Biaya Transportasi", ["Belum Termasuk", "Sudah Termasuk"])
             with c6: status_akomodasi = st.selectbox("Biaya Akomodasi", ["Belum Termasuk", "Sudah Termasuk"])
 
-        # --- LOGIKA AUTO-NUMBERING (PANGGIL FUNGSI TERBARU) ---
+        # --- LOGIKA AUTO-NUMBERING VIA SUPABASE ---
         tahun_pilih = tgl_dokumen.year
         romawi = to_roman(tgl_dokumen.month)
-        next_num = get_next_contract_number(tahun_pilih, skema) # ---> Parameternya sekarang 2 (Tahun dan Skema)
+        next_num = get_next_contract_number(tahun_pilih, skema)
         no_urut_auto = f"{next_num:03d}"
 
         prev_no_kontrak = ""
@@ -259,7 +254,7 @@ with tab1:
                     try:
                         payload_data = {
                             "no_kontrak": prev_no_kontrak, 
-                            "no_qa": prev_no_qa, # ---> Ditambahkan untuk Spreadsheet
+                            "no_qa": prev_no_qa,
                             "nama_klien": nama_klien, 
                             "marketing": marketing,
                             "no_wa_marketing": format_wa_number(tlp_marketing), 
