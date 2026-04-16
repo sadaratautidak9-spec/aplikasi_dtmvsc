@@ -231,12 +231,45 @@ with tab1:
                         st.error(f"⚠️ Template tidak ditemukan! Pastikan file `{template_path}` sudah ada di folder 'templates/'.")
                         st.stop()
 
-                    # --- PROSES RENDER (HANYA 1 DOKUMEN) ---
+# --- PROSES RENDER (HANYA 1 DOKUMEN) ---
                     doc = DocxTemplate(template_path)
                     doc.render(context)
-                    fname_doc = f"Kontrak_QA_{prev_no_kontrak.replace('/', '-')}_{nama_klien}.docx"
+                    
+                    # FORMAT PENAMAAN BARU: Perjanjian Kerjasama PPIU PT ABCD.docx
+                    fname_doc = f"Perjanjian Kerjasama {scope_label} {nama_klien}.docx"
                     path_docx = f"output/word/{fname_doc}"
                     doc.save(path_docx)
+
+                    # --- KIRIM DATA & 1 FILE WORD KE n8n ---
+                    try:
+                        payload_data = {
+                            "no_kontrak": prev_no_kontrak, 
+                            "nama_klien": nama_klien, 
+                            "marketing": marketing,
+                            "no_wa_marketing": format_wa_number(tlp_marketing), 
+                            "no_wa_klien": format_wa_number(tlp_klien),
+                            "skema": skema, 
+                            "ruang_lingkup": scope_label, 
+                            "harga": harga_formatted,
+                            "alamat_klien": alamat_klien, 
+                            "tanggal_dokumen" : str(tgl_dokumen),
+                            # --- TAMBAHAN STATUS UNTUK SUPABASE ---
+                            "status_bayar": status_bayar,
+                            "kategori_audit": kategori_audit,
+                            "status_progres": status_progres
+                        }
+                        files_to_send = {
+                            "file_word": (fname_doc, open(path_docx, "rb"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                        }
+                        if "MASUKKAN-ID-WEBHOOK" not in N8N_WEBHOOK_URL:
+                            response = requests.post(N8N_WEBHOOK_URL, data=payload_data, files=files_to_send)
+                            if response.status_code == 200:
+                                st.success("🚀 Data dan File Word berhasil dikirim ke n8n!")
+                                get_next_contract_number.clear()
+                            else:
+                                st.warning(f"⚠️ Gagal mengirim ke n8n. Status Code: {response.status_code}")
+                    except Exception as e_n8n:
+                        st.warning(f"⚠️ Tidak dapat terhubung ke n8n. Pastikan n8n menyala. Error: {e_n8n}")
 
                     # --- KIRIM DATA & 1 FILE WORD KE n8n ---
                     try:
