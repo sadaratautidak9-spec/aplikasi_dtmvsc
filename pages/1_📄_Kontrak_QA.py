@@ -93,20 +93,24 @@ tab1, tab2, tab3 = st.tabs(["📄 Form Generator", "📊 Database Kontrak", "⚙
 with tab1:
     with st.form("doc_form", clear_on_submit=False):
         
-        # --- KARTU 1: SKEMA & RUANG LINGKUP ---
-        with st.container(border=True):
-            st.markdown("<h4 class='section-title'><span class='material-symbols-outlined'>category</span> 1. Skema & Ruang Lingkup</h4>", unsafe_allow_html=True)
-            col_s1, col_s2 = st.columns(2)
-            with col_s1:
-                skema = st.selectbox("Pilih Skema", ["LSUHK", "LSPr", "Non KAN"])
-            with col_s2:
-                if skema == "LSUHK":
-                    scope_pilihan = st.multiselect("Ruang Lingkup (LSUHK)", ["PPIU", "PIHK"], default=["PPIU"])
-                elif skema == "LSPr":
-                    scope_pilihan = [st.selectbox("Ruang Lingkup (LSPr)", ["Hotel", "Restoran", "BPW"])]
-                else:
-                    scope_pilihan = [st.selectbox("Ruang Lingkup (Non KAN)", ["Hotel Bintang 1", "Hotel Bintang 2", "Hotel Bintang 3", "Hotel Bintang 4", "Hotel Bintang 5"])]
+        with tab1:
+    # --- KARTU 1 (DIKELUARKAN DARI FORM AGAR INTERAKTIF) ---
+    with st.container(border=True):
+        st.markdown("<h4 class='section-title'><span class='material-symbols-outlined'>category</span> 1. Skema & Ruang Lingkup</h4>", unsafe_allow_html=True)
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            skema = st.selectbox("Pilih Skema", ["LSUHK", "LSPr", "Non KAN"])
+        with col_s2:
+            if skema == "LSUHK":
+                scope_pilihan = st.multiselect("Ruang Lingkup (LSUHK)", ["PPIU", "PIHK"], default=["PPIU"])
+            elif skema == "LSPr":
+                scope_pilihan = [st.selectbox("Ruang Lingkup (LSPr)", ["Hotel", "Restoran", "BPW"])]
+            else:
+                scope_pilihan = [st.selectbox("Ruang Lingkup (Non KAN)", ["Hotel Bintang 1", "Hotel Bintang 2", "Hotel Bintang 3", "Hotel Bintang 4", "Hotel Bintang 5"])]
 
+    # --- FORM DIMULAI DARI KARTU 2 ---
+    with st.form("doc_form", clear_on_submit=False):
+        
         # --- KARTU 2: IDENTITAS KLIEN ---
         with st.container(border=True):
             st.markdown("<h4 class='section-title'><span class='material-symbols-outlined'>domain</span> 2. Identitas Klien</h4>", unsafe_allow_html=True)
@@ -121,6 +125,9 @@ with tab1:
                 jabatan_raw = st.text_input("Jabatan Penandatangan")
                 lokasi = st.text_input("Lokasi Penandatanganan", "Jakarta")
                 tgl_dokumen = st.date_input("Tanggal Dokumen", datetime.now())
+
+        # --- KARTU 3: FINANSIAL & MARKETING ---
+# ... (Biarkan sisa kode di bawahnya tetap sama seperti sebelumnya) ...
 
         # --- KARTU 3: FINANSIAL & MARKETING ---
         with st.container(border=True):
