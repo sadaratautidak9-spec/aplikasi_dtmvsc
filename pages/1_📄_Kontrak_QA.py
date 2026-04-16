@@ -67,20 +67,35 @@ def format_wa_number(number):
 def format_rupiah(angka):
     return f"Rp. {angka:,.0f}".replace(",", ".")
 
-@st.cache_data(ttl=5) 
+# ---> FUNGSI AUTO-NUMBERING TERBARU (100% REALTIME & LEBIH KUAT) <---
 def get_next_contract_number(tahun_pilih, skema_klien):
     try:
+        # Ambil data langsung dari Supabase
         res = supabase.table('data_kontrak').select('created_at, skema').execute()
+        
         if res.data:
             df = pd.DataFrame(res.data)
+            
+            # Jika kolom skema tidak ditemukan, return 1
             if 'skema' not in df.columns:
-                df['skema'] = ""
+                return 1
                 
+            # 1. Bersihkan spasi tersembunyi agar pencocokan akurat
+            df['skema'] = df['skema'].astype(str).str.strip()
+            skema_klien_bersih = str(skema_klien).strip()
+            
+            # 2. Ambil tahun dari tanggal
             df['year'] = pd.to_datetime(df['created_at']).dt.year
-            count_skema_ini = len(df[(df['year'] == tahun_pilih) & (df['skema'] == skema_klien)])
+            
+            # 3. Hitung baris yang TAHUN dan SKEMA-nya sama (Casing-sensitive)
+            count_skema_ini = len(df[(df['year'] == tahun_pilih) & (df['skema'] == skema_klien_bersih)])
+            
             return count_skema_ini + 1
+            
         return 1
     except Exception as e:
+        # TAMPILKAN ERROR MERAH JIKA GAGAL (Jangan sembunyikan jadi angka 1)
+        st.error(f"⚠️ Error sistem perhitungan nomor: {e}")
         return 1
 
 # 3. TAMPILAN UTAMA
