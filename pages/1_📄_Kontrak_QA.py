@@ -67,15 +67,19 @@ def format_wa_number(number):
 def format_rupiah(angka):
     return f"Rp. {angka:,.0f}".replace(",", ".")
 
-@st.cache_data(ttl=10)
-def get_next_contract_number(tahun_pilih):
+# ---> FUNGSI AUTO-NUMBERING TERBARU (MEMISAHKAN BERDASARKAN SKEMA) <---
+@st.cache_data(ttl=5) 
+def get_next_contract_number(tahun_pilih, skema_klien):
     try:
-        res = supabase.table('data_kontrak').select('created_at').execute()
+        res = supabase.table('data_kontrak').select('created_at, skema').execute()
         if res.data:
             df = pd.DataFrame(res.data)
+            if 'skema' not in df.columns:
+                df['skema'] = ""
+                
             df['year'] = pd.to_datetime(df['created_at']).dt.year
-            count_tahun_ini = len(df[df['year'] == tahun_pilih])
-            return count_tahun_ini + 1
+            count_skema_ini = len(df[(df['year'] == tahun_pilih) & (df['skema'] == skema_klien)])
+            return count_skema_ini + 1
         return 1
     except Exception as e:
         return 1
@@ -111,7 +115,6 @@ with tab1:
                 nama_klien = st.text_input("Nama Klien (PT/CV)")
                 alamat_klien = st.text_area("Alamat Lengkap Klien", height=100)
                 tlp_klien = st.text_input("No HP/WA Klien")
-                # ---> TAMBAHAN: INPUT EMAIL KLIEN
                 email_klien = st.text_input("Email Klien")
             with c2:
                 nama_ttd = st.text_input("Nama Penandatangan (Direktur)")
@@ -138,10 +141,10 @@ with tab1:
             with c5: status_transportasi = st.selectbox("Biaya Transportasi", ["Belum Termasuk", "Sudah Termasuk"])
             with c6: status_akomodasi = st.selectbox("Biaya Akomodasi", ["Belum Termasuk", "Sudah Termasuk"])
 
-        # --- LOGIKA AUTO-NUMBERING VIA SUPABASE ---
+        # --- LOGIKA AUTO-NUMBERING (PANGGIL FUNGSI TERBARU) ---
         tahun_pilih = tgl_dokumen.year
         romawi = to_roman(tgl_dokumen.month)
-        next_num = get_next_contract_number(tahun_pilih)
+        next_num = get_next_contract_number(tahun_pilih, skema) # ---> Parameternya sekarang 2 (Tahun dan Skema)
         no_urut_auto = f"{next_num:03d}"
 
         prev_no_kontrak = ""
@@ -180,7 +183,6 @@ with tab1:
 
     # 4. LOGIKA EKSEKUSI
     if submit:
-        # ---> TAMBAHAN: Validasi Email
         required_fields = {
             "Nama Klien": nama_klien, "Alamat": alamat_klien, "Nama Direktur": nama_ttd, 
             "Jabatan": jabatan_raw, "Harga": harga_awal, "No WA Marketing": tlp_marketing,
@@ -206,13 +208,12 @@ with tab1:
                     scope_label = " & ".join(scope_pilihan)
                     harga_formatted = format_rupiah(harga_awal)
 
-                    # ---> TAMBAHAN: Format Tanggal Rapi ("21 Maret 2026")
                     bulan_indo_list = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
                     tanggal_indo_rapi = f"{tgl_dokumen.day} {bulan_indo_list[tgl_dokumen.month]} {tgl_dokumen.year}"
 
                     context = {
                         'hari': hari_nama, 'tgl_teks': tgl_h, 'bulan': bln_h, 'tahun_teks': thn_h,
-                        'tgl_angka': tanggal_indo_rapi, # Berlaku untuk template teks dokumen
+                        'tgl_angka': tanggal_indo_rapi,
                         'no_kontrak': prev_no_kontrak, 'no_qa': prev_no_qa,
                         'nama_klien': nama_klien, 'alamat_klien': alamat_klien, 'tlp_klien': tlp_klien,
                         'email_klien': email_klien,
@@ -240,7 +241,6 @@ with tab1:
                         st.error(f"⚠️ Template tidak ditemukan! Pastikan file `{template_path}` sudah ada.")
                         st.stop()
 
-                    # ---> PERBAIKAN: Format Penamaan Baru "Perjanjian Kerjasama PPIU PT ABCD.docx"
                     doc = DocxTemplate(template_path)
                     doc.render(context)
                     
@@ -250,9 +250,9 @@ with tab1:
 
                     # --- KIRIM DATA & FILE WORD KE n8n ---
                     try:
-                        # ---> PERBAIKAN: Payload Data Supabase lengkap dengan Email dan Status
                         payload_data = {
                             "no_kontrak": prev_no_kontrak, 
+                            "no_qa": prev_no_qa, # ---> Ditambahkan untuk Spreadsheet
                             "nama_klien": nama_klien, 
                             "marketing": marketing,
                             "no_wa_marketing": format_wa_number(tlp_marketing), 
@@ -262,7 +262,7 @@ with tab1:
                             "ruang_lingkup": scope_label, 
                             "harga": harga_formatted,
                             "alamat_klien": alamat_klien, 
-                            "tanggal_dokumen": tanggal_indo_rapi, # Format sudah "21 Maret 2026"
+                            "tanggal_dokumen": tanggal_indo_rapi, 
                             "status_bayar": status_bayar,
                             "kategori_audit": kategori_audit,
                             "status_progres": status_progres
@@ -284,7 +284,7 @@ with tab1:
                     wa_number = format_wa_number(tlp_marketing)
                     wa_text = (f"Halo {marketing},\n\nDokumen PKS dan QA untuk klien *{nama_klien}* sudah selesai dibuat.\n\n"
                                f"📌 *No Kontrak:* {prev_no_kontrak}\n📌 *Skema:* {skema}\n📌 *Ruang Lingkup:* {scope_label}\n"
-                               f"💰 *Harga:* {harga_formatted}\n\nMohon tunggu beberapa saat hingga sistem n8n mengirimkan versi PDF-nya. Terima kasih.")
+                               f"💰 *Harga:* {harga_formatted}\n\nMohon tunggu beberapa saat hingga sistem n8n memproses versi PDF-nya. Terima kasih.")
                     
                     st.session_state.docs_generated = True
                     st.session_state.path_doc = path_docx
@@ -299,7 +299,7 @@ with tab1:
     if st.session_state.docs_generated:
         with st.container(border=True):
             st.markdown("<h4 style='color: #16a34a; margin-top: 0;'>🎉 Dokumen Word Siap Diunduh!</h4>", unsafe_allow_html=True)
-            st.info("💡 Versi PDF akan diproses dan dikirimkan secara otomatis oleh sistem n8n di belakang layar.")
+            st.info("💡 Versi PDF akan diproses dan disimpan secara otomatis oleh sistem n8n ke Google Drive.")
             
             if os.path.exists(st.session_state.path_doc):
                 with open(st.session_state.path_doc, "rb") as f:
