@@ -142,15 +142,35 @@ with tab1:
         next_num = get_next_contract_number(tahun_pilih)
         no_urut_auto = f"{next_num:03d}"
 
+        # Inisialisasi variabel
+        prev_no_kontrak = ""
+        prev_no_qa = ""
+
         if skema == "LSUHK":
-            prev_no_kontrak = f"{no_urut_auto}/DTM/LSUHK/{romawi}/{tahun_pilih}"
-            prev_no_qa = f"{no_urut_auto}/QA/LSUHK/{romawi}/{tahun_pilih}"
+            if len(scope_pilihan) == 2: # PPIU & PIHK
+                prev_no_kontrak = f"{no_urut_auto}/DTM/PIHK/{romawi}/{tahun_pilih}"
+                prev_no_qa = f"{no_urut_auto}/QA/PIHK-DTM/{romawi}/{tahun_pilih}"
+            elif "PPIU" in scope_pilihan:
+                prev_no_kontrak = f"{no_urut_auto}/DTM/PPIU/{romawi}/{tahun_pilih}"
+                prev_no_qa = f"{no_urut_auto}/QA/PPIU-DTM/{romawi}/{tahun_pilih}"
+            else: # PIHK
+                prev_no_kontrak = f"{no_urut_auto}/DTM/PIHK/{romawi}/{tahun_pilih}"
+                prev_no_qa = f"{no_urut_auto}/QA/PIHK-DTM/{romawi}/{tahun_pilih}"
+
         elif skema == "LSPr":
-            prev_no_kontrak = f"{no_urut_auto}/DTM/LSPR/{romawi}/{tahun_pilih}"
-            prev_no_qa = f"{no_urut_auto}/QA/LSPR/{romawi}/{tahun_pilih}"
-        else:
+            if "Hotel" in scope_pilihan:
+                prev_no_kontrak = f"{no_urut_auto}/DTM/HOTEL/{romawi}/{tahun_pilih}"
+                prev_no_qa = f"{no_urut_auto}/QA/HT-DTM/{romawi}/{tahun_pilih}"
+            elif "Restoran" in scope_pilihan:
+                prev_no_kontrak = f"{no_urut_auto}/DTM/RESTORAN/{romawi}/{tahun_pilih}"
+                prev_no_qa = f"{no_urut_auto}/QA/RS-DTM/{romawi}/{tahun_pilih}"
+            else: # BPW
+                prev_no_kontrak = f"{no_urut_auto}/DTM/BPW/{romawi}/{tahun_pilih}"
+                prev_no_qa = f"{no_urut_auto}/QA/BPW-DTM/{romawi}/{tahun_pilih}"
+
+        else: # Non KAN (Sementara pakai format default sampai ada kepastian)
             prev_no_kontrak = f"{no_urut_auto}/DTM/NON-KAN/{romawi}/{tahun_pilih}"
-            prev_no_qa = f"{no_urut_auto}/QA/NON-KAN/{romawi}/{tahun_pilih}"
+            prev_no_qa = f"{no_urut_auto}/QA/NON-KAN-DTM/{romawi}/{tahun_pilih}"
 
         st.info(f"💡 **Penomoran Otomatis:** No Kontrak: `{prev_no_kontrak}` | No QA: `{prev_no_qa}`")
 
