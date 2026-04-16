@@ -67,7 +67,6 @@ def format_wa_number(number):
 def format_rupiah(angka):
     return f"Rp. {angka:,.0f}".replace(",", ".")
 
-# ---> FUNGSI AUTO-NUMBERING TERBARU (MEMISAHKAN BERDASARKAN SKEMA) <---
 @st.cache_data(ttl=5) 
 def get_next_contract_number(tahun_pilih, skema_klien):
     try:
@@ -92,7 +91,7 @@ tab1, tab2, tab3 = st.tabs(["📄 Form Generator", "📊 Database Kontrak", "⚙
 
 with tab1:
     
-    # --- KARTU 1: SKEMA & RUANG LINGKUP (Di luar form agar interaktif!) ---
+    # --- KARTU 1: SKEMA & RUANG LINGKUP ---
     with st.container(border=True):
         st.markdown("<h4 class='section-title'><span class='material-symbols-outlined'>category</span> 1. Skema & Ruang Lingkup</h4>", unsafe_allow_html=True)
         col_s1, col_s2 = st.columns(2)
@@ -106,7 +105,7 @@ with tab1:
             else:
                 scope_pilihan = [st.selectbox("Ruang Lingkup (Non KAN)", ["Hotel Bintang 1", "Hotel Bintang 2", "Hotel Bintang 3", "Hotel Bintang 4", "Hotel Bintang 5"])]
 
-    # --- KARTU 2 & 3: DIMULAI DI DALAM FORM ---
+    # --- KARTU 2 & 3 (DI DALAM FORM) ---
     with st.form("doc_form", clear_on_submit=False):
         
         # --- KARTU 2: IDENTITAS KLIEN ---
@@ -114,11 +113,15 @@ with tab1:
             st.markdown("<h4 class='section-title'><span class='material-symbols-outlined'>domain</span> 2. Identitas Klien</h4>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
-                nama_klien = st.text_input("Nama Klien (PT/CV)")
+                nama_klien = st.text_input("Nama Klien Organisasi (PT/CV)")
+                # ---> TAMBAHAN FORMLIR BRAND & KATEGORI
+                nama_brand = st.text_input("Nama Brand (Opsional)", help="Isi apabila organisasi/PT memiliki nama brand (Misal: Hotel Asoka)")
                 alamat_klien = st.text_area("Alamat Lengkap Klien", height=100)
                 tlp_klien = st.text_input("No HP/WA Klien")
                 email_klien = st.text_input("Email Klien")
             with c2:
+                # ---> TAMBAHAN KATEGORI (Dimasukkan disini agar kolom seimbang)
+                kategori_brand = st.text_input("Kategori (Opsional)", help="Khusus LSPr. Contoh: Bintang 5, Bintang 3, dll.")
                 nama_ttd = st.text_input("Nama Penandatangan (Direktur)")
                 jabatan_raw = st.text_input("Jabatan Penandatangan")
                 lokasi = st.text_input("Lokasi Penandatanganan", "Jakarta")
@@ -143,7 +146,7 @@ with tab1:
             with c5: status_transportasi = st.selectbox("Biaya Transportasi", ["Belum Termasuk", "Sudah Termasuk"])
             with c6: status_akomodasi = st.selectbox("Biaya Akomodasi", ["Belum Termasuk", "Sudah Termasuk"])
 
-        # --- LOGIKA AUTO-NUMBERING VIA SUPABASE ---
+        # --- LOGIKA AUTO-NUMBERING ---
         tahun_pilih = tgl_dokumen.year
         romawi = to_roman(tgl_dokumen.month)
         next_num = get_next_contract_number(tahun_pilih, skema)
@@ -162,7 +165,6 @@ with tab1:
             else: # PIHK
                 prev_no_kontrak = f"{no_urut_auto}/DTM/PIHK/{romawi}/{tahun_pilih}"
                 prev_no_qa = f"{no_urut_auto}/QA/PIHK-DTM/{romawi}/{tahun_pilih}"
-
         elif skema == "LSPr":
             if "Hotel" in scope_pilihan:
                 prev_no_kontrak = f"{no_urut_auto}/DTM/HOTEL/{romawi}/{tahun_pilih}"
@@ -173,14 +175,12 @@ with tab1:
             else: # BPW
                 prev_no_kontrak = f"{no_urut_auto}/DTM/BPW/{romawi}/{tahun_pilih}"
                 prev_no_qa = f"{no_urut_auto}/QA/BPW-DTM/{romawi}/{tahun_pilih}"
-
         else: # Non KAN
             prev_no_kontrak = f"{no_urut_auto}/DTM/NON-KAN/{romawi}/{tahun_pilih}"
             prev_no_qa = f"{no_urut_auto}/QA/NON-KAN-DTM/{romawi}/{tahun_pilih}"
 
         st.info(f"💡 **Penomoran Otomatis:** No Kontrak: `{prev_no_kontrak}` | No QA: `{prev_no_qa}`")
 
-        # TOMBOL SUBMIT BESAR
         submit = st.form_submit_button("🚀 Generate Dokumen (Word) & Kirim ke n8n", type="primary", use_container_width=True)
 
     # 4. LOGIKA EKSEKUSI
@@ -207,20 +207,46 @@ with tab1:
                 try:
                     hari_nama = get_hari_indo(tgl_dokumen)
                     tgl_h, bln_h, thn_h = tgl_terbilang(tgl_dokumen)
-                    scope_label = " & ".join(scope_pilihan)
-                    harga_formatted = format_rupiah(harga_awal)
+                    
+                    # ---> LOGIKA SCOPE PENDEK (UNTUK DATABASE & NAMA FILE)
+                    scope_pendek = " & ".join(scope_pilihan) 
+                    
+                    # ---> LOGIKA SCOPE PANJANG (KHUSUS UNTUK TEMPLATE WORD)
+                    scope_panjang = ""
+                    if skema == "LSUHK":
+                        if "PPIU" in scope_pilihan and "PIHK" in scope_pilihan:
+                            scope_panjang = "Penyelenggara Perjalanan Ibadah Umrah (PPIU) & Penyelenggara Ibadah Haji Khusus (PIHK)"
+                        elif "PPIU" in scope_pilihan:
+                            scope_panjang = "Penyelenggara Perjalanan Ibadah Umrah (PPIU)"
+                        elif "PIHK" in scope_pilihan:
+                            scope_panjang = "Penyelenggara Ibadah Haji Khusus (PIHK)"
+                    elif skema == "LSPr":
+                        if "Hotel" in scope_pilihan:
+                            scope_panjang = "Penyediaan Akomodasi (Hotel)"
+                        elif "Restoran" in scope_pilihan:
+                            scope_panjang = "Jasa makanan dan minuman (Restoran)"
+                        elif "BPW" in scope_pilihan:
+                            scope_panjang = "Biro Perjalanan Wisata (BPW)"
+                    else: # Non KAN
+                        scope_panjang = scope_pendek
 
+                    harga_formatted = format_rupiah(harga_awal)
                     bulan_indo_list = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
                     tanggal_indo_rapi = f"{tgl_dokumen.day} {bulan_indo_list[tgl_dokumen.month]} {tgl_dokumen.year}"
 
+                    # ---> CONTEXT DOCX (Variabel untuk Word)
                     context = {
                         'hari': hari_nama, 'tgl_teks': tgl_h, 'bulan': bln_h, 'tahun_teks': thn_h,
                         'tgl_angka': tanggal_indo_rapi,
                         'no_kontrak': prev_no_kontrak, 'no_qa': prev_no_qa,
                         'nama_klien': nama_klien, 'alamat_klien': alamat_klien, 'tlp_klien': tlp_klien,
                         'email_klien': email_klien,
+                        'nama_brand': nama_brand if nama_brand else "-", # Jika kosong, isi "-"
+                        'kategori': kategori_brand if kategori_brand else "-", # Jika kosong, isi "-"
                         'nama_ttd': nama_ttd, 'jabatan': jabatan_raw, 'jabatan_ttd': f"{jabatan_raw} {nama_klien}",
-                        'harga': harga_formatted, 'scope': scope_label, 'lokasi': lokasi,
+                        'harga': harga_formatted, 
+                        'scope': scope_panjang, # <--- DISINI DICETAK PANJANG
+                        'lokasi': lokasi,
                         'status_transportasi': status_transportasi, 'status_akomodasi': status_akomodasi
                     }
 
@@ -246,22 +272,24 @@ with tab1:
                     doc = DocxTemplate(template_path)
                     doc.render(context)
                     
-                    fname_doc = f"Perjanjian Kerjasama {scope_label} {nama_klien}.docx"
+                    fname_doc = f"Perjanjian Kerjasama {scope_pendek} {nama_klien}.docx"
                     path_docx = f"output/word/{fname_doc}"
                     doc.save(path_docx)
 
-                    # --- KIRIM DATA & FILE WORD KE n8n ---
+                    # --- KIRIM DATA PUSAT KE n8n (SUPABASE & SPREADSHEET) ---
                     try:
                         payload_data = {
                             "no_kontrak": prev_no_kontrak, 
                             "no_qa": prev_no_qa,
                             "nama_klien": nama_klien, 
+                            "nama_brand": nama_brand, # Tambahan data ke Supabase opsional
+                            "kategori_brand": kategori_brand, # Tambahan data ke Supabase opsional
                             "marketing": marketing,
                             "no_wa_marketing": format_wa_number(tlp_marketing), 
                             "no_wa_klien": format_wa_number(tlp_klien),
                             "email_klien": email_klien, 
                             "skema": skema, 
-                            "ruang_lingkup": scope_label, 
+                            "ruang_lingkup": scope_pendek, # <--- DISINI DIKIRIM PENDEK!
                             "harga": harga_formatted,
                             "alamat_klien": alamat_klien, 
                             "tanggal_dokumen": tanggal_indo_rapi, 
@@ -285,7 +313,7 @@ with tab1:
                     # --- SIAPKAN LINK WHATSAPP ---
                     wa_number = format_wa_number(tlp_marketing)
                     wa_text = (f"Halo {marketing},\n\nDokumen PKS dan QA untuk klien *{nama_klien}* sudah selesai dibuat.\n\n"
-                               f"📌 *No Kontrak:* {prev_no_kontrak}\n📌 *Skema:* {skema}\n📌 *Ruang Lingkup:* {scope_label}\n"
+                               f"📌 *No Kontrak:* {prev_no_kontrak}\n📌 *Skema:* {skema}\n📌 *Ruang Lingkup:* {scope_pendek}\n"
                                f"💰 *Harga:* {harga_formatted}\n\nMohon tunggu beberapa saat hingga sistem n8n memproses versi PDF-nya. Terima kasih.")
                     
                     st.session_state.docs_generated = True
@@ -293,7 +321,7 @@ with tab1:
                     st.session_state.wa_url = f"https://wa.me/{wa_number}?text={urllib.parse.quote(wa_text)}"
 
                     st.balloons()
-                    st.success(f"✅ Selesai! Dokumen Word terbuat dan Data terkirim ke n8n!")
+                    st.success(f"✅ Selesai! Dokumen terbuat dan Data terkirim ke n8n!")
 
                 except Exception as e:
                     st.error(f"❌ Terjadi kesalahan teknis: {e}")
