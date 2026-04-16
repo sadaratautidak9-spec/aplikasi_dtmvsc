@@ -111,6 +111,8 @@ with tab1:
                 nama_klien = st.text_input("Nama Klien (PT/CV)")
                 alamat_klien = st.text_area("Alamat Lengkap Klien", height=100)
                 tlp_klien = st.text_input("No HP/WA Klien")
+                # ---> TAMBAHAN: INPUT EMAIL KLIEN
+                email_klien = st.text_input("Email Klien")
             with c2:
                 nama_ttd = st.text_input("Nama Penandatangan (Direktur)")
                 jabatan_raw = st.text_input("Jabatan Penandatangan")
@@ -142,7 +144,6 @@ with tab1:
         next_num = get_next_contract_number(tahun_pilih)
         no_urut_auto = f"{next_num:03d}"
 
-        # Inisialisasi variabel
         prev_no_kontrak = ""
         prev_no_qa = ""
 
@@ -168,7 +169,7 @@ with tab1:
                 prev_no_kontrak = f"{no_urut_auto}/DTM/BPW/{romawi}/{tahun_pilih}"
                 prev_no_qa = f"{no_urut_auto}/QA/BPW-DTM/{romawi}/{tahun_pilih}"
 
-        else: # Non KAN (Sementara pakai format default sampai ada kepastian)
+        else: # Non KAN
             prev_no_kontrak = f"{no_urut_auto}/DTM/NON-KAN/{romawi}/{tahun_pilih}"
             prev_no_qa = f"{no_urut_auto}/QA/NON-KAN-DTM/{romawi}/{tahun_pilih}"
 
@@ -177,11 +178,13 @@ with tab1:
         # TOMBOL SUBMIT BESAR
         submit = st.form_submit_button("🚀 Generate Dokumen (Word) & Kirim ke n8n", type="primary", use_container_width=True)
 
-    # 4. LOGIKA EKSEKUSI (SERVER-READY)
+    # 4. LOGIKA EKSEKUSI
     if submit:
+        # ---> TAMBAHAN: Validasi Email
         required_fields = {
             "Nama Klien": nama_klien, "Alamat": alamat_klien, "Nama Direktur": nama_ttd, 
-            "Jabatan": jabatan_raw, "Harga": harga_awal, "No WA Marketing": tlp_marketing
+            "Jabatan": jabatan_raw, "Harga": harga_awal, "No WA Marketing": tlp_marketing,
+            "Email Klien": email_klien
         }
         empty_fields = [k for k, v in required_fields.items() if not v or v == 0]
 
@@ -191,6 +194,8 @@ with tab1:
             st.error("⚠️ **Gagal!** No HP/WA Klien hanya boleh berisi angka!")
         elif tlp_marketing and not tlp_marketing.replace("+", "").isdigit():
             st.error("⚠️ **Gagal!** No HP/WA Marketing hanya boleh berisi angka!")
+        elif email_klien and "@" not in email_klien:
+            st.error("⚠️ **Gagal!** Format Email Klien tidak valid!")
         elif skema == "LSUHK" and len(scope_pilihan) == 0:
             st.error("⚠️ **Gagal!** Anda harus memilih minimal satu Ruang Lingkup untuk LSUHK!")
         else:
@@ -201,18 +206,22 @@ with tab1:
                     scope_label = " & ".join(scope_pilihan)
                     harga_formatted = format_rupiah(harga_awal)
 
+                    # ---> TAMBAHAN: Format Tanggal Rapi ("21 Maret 2026")
+                    bulan_indo_list = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+                    tanggal_indo_rapi = f"{tgl_dokumen.day} {bulan_indo_list[tgl_dokumen.month]} {tgl_dokumen.year}"
+
                     context = {
                         'hari': hari_nama, 'tgl_teks': tgl_h, 'bulan': bln_h, 'tahun_teks': thn_h,
-                        'tgl_angka': tgl_dokumen.strftime('%d %B %Y'), 'no_kontrak': prev_no_kontrak, 'no_qa': prev_no_qa,
+                        'tgl_angka': tanggal_indo_rapi, # Berlaku untuk template teks dokumen
+                        'no_kontrak': prev_no_kontrak, 'no_qa': prev_no_qa,
                         'nama_klien': nama_klien, 'alamat_klien': alamat_klien, 'tlp_klien': tlp_klien,
+                        'email_klien': email_klien,
                         'nama_ttd': nama_ttd, 'jabatan': jabatan_raw, 'jabatan_ttd': f"{jabatan_raw} {nama_klien}",
                         'harga': harga_formatted, 'scope': scope_label, 'lokasi': lokasi,
                         'status_transportasi': status_transportasi, 'status_akomodasi': status_akomodasi
                     }
 
-                    # --- LOGIKA PEMILIHAN 1 TEMPLATE GABUNGAN ---
                     template_path = ""
-
                     if skema == "LSUHK":
                         if len(scope_pilihan) == 2: template_path = "templates/gabungan_lsuhk_ppiu_pihk.docx"
                         elif "PPIU" in scope_pilihan: template_path = "templates/gabungan_lsuhk_ppiu.docx"
@@ -228,56 +237,35 @@ with tab1:
                     os.makedirs("templates", exist_ok=True)
 
                     if not os.path.exists(template_path):
-                        st.error(f"⚠️ Template tidak ditemukan! Pastikan file `{template_path}` sudah ada di folder 'templates/'.")
+                        st.error(f"⚠️ Template tidak ditemukan! Pastikan file `{template_path}` sudah ada.")
                         st.stop()
 
-# --- PROSES RENDER (HANYA 1 DOKUMEN) ---
+                    # ---> PERBAIKAN: Format Penamaan Baru "Perjanjian Kerjasama PPIU PT ABCD.docx"
                     doc = DocxTemplate(template_path)
                     doc.render(context)
                     
-                    # FORMAT PENAMAAN BARU: Perjanjian Kerjasama PPIU PT ABCD.docx
                     fname_doc = f"Perjanjian Kerjasama {scope_label} {nama_klien}.docx"
                     path_docx = f"output/word/{fname_doc}"
                     doc.save(path_docx)
 
-                    # --- KIRIM DATA & 1 FILE WORD KE n8n ---
+                    # --- KIRIM DATA & FILE WORD KE n8n ---
                     try:
+                        # ---> PERBAIKAN: Payload Data Supabase lengkap dengan Email dan Status
                         payload_data = {
                             "no_kontrak": prev_no_kontrak, 
                             "nama_klien": nama_klien, 
                             "marketing": marketing,
                             "no_wa_marketing": format_wa_number(tlp_marketing), 
                             "no_wa_klien": format_wa_number(tlp_klien),
+                            "email_klien": email_klien, 
                             "skema": skema, 
                             "ruang_lingkup": scope_label, 
                             "harga": harga_formatted,
                             "alamat_klien": alamat_klien, 
-                            "tanggal_dokumen" : str(tgl_dokumen),
-                            # --- TAMBAHAN STATUS UNTUK SUPABASE ---
+                            "tanggal_dokumen": tanggal_indo_rapi, # Format sudah "21 Maret 2026"
                             "status_bayar": status_bayar,
                             "kategori_audit": kategori_audit,
                             "status_progres": status_progres
-                        }
-                        files_to_send = {
-                            "file_word": (fname_doc, open(path_docx, "rb"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-                        }
-                        if "MASUKKAN-ID-WEBHOOK" not in N8N_WEBHOOK_URL:
-                            response = requests.post(N8N_WEBHOOK_URL, data=payload_data, files=files_to_send)
-                            if response.status_code == 200:
-                                st.success("🚀 Data dan File Word berhasil dikirim ke n8n!")
-                                get_next_contract_number.clear()
-                            else:
-                                st.warning(f"⚠️ Gagal mengirim ke n8n. Status Code: {response.status_code}")
-                    except Exception as e_n8n:
-                        st.warning(f"⚠️ Tidak dapat terhubung ke n8n. Pastikan n8n menyala. Error: {e_n8n}")
-
-                    # --- KIRIM DATA & 1 FILE WORD KE n8n ---
-                    try:
-                        payload_data = {
-                            "no_kontrak": prev_no_kontrak, "nama_klien": nama_klien, "marketing": marketing,
-                            "no_wa_marketing": format_wa_number(tlp_marketing), "no_wa_klien": format_wa_number(tlp_klien),
-                            "skema": skema, "ruang_lingkup": scope_label, "harga": harga_formatted,
-                            "alamat_klien": alamat_klien, "tanggal_dokumen" : str(tgl_dokumen)
                         }
                         files_to_send = {
                             "file_word": (fname_doc, open(path_docx, "rb"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
