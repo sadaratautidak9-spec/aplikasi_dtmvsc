@@ -67,34 +67,33 @@ def format_wa_number(number):
 def format_rupiah(angka):
     return f"Rp. {angka:,.0f}".replace(",", ".")
 
-# ---> FUNGSI AUTO-NUMBERING TERBARU (100% REALTIME & LEBIH KUAT) <---
+# ---> FUNGSI AUTO-NUMBERING TERBARU (MEMBACA HURUF KAPITAL "Skema") <---
 def get_next_contract_number(tahun_pilih, skema_klien):
     try:
-        # Ambil data langsung dari Supabase
-        res = supabase.table('data_kontrak').select('created_at, skema').execute()
+        # Panggil menggunakan 'Skema' (Huruf S Besar sesuai yang ada di Supabase!)
+        res = supabase.table('data_kontrak').select('created_at, Skema').execute()
         
         if res.data:
             df = pd.DataFrame(res.data)
             
-            # Jika kolom skema tidak ditemukan, return 1
-            if 'skema' not in df.columns:
+            # Cocokkan juga dengan huruf S besar di DataFrame
+            if 'Skema' not in df.columns:
                 return 1
                 
-            # 1. Bersihkan spasi tersembunyi agar pencocokan akurat
-            df['skema'] = df['skema'].astype(str).str.strip()
+            # Bersihkan spasi
+            df['Skema'] = df['Skema'].astype(str).str.strip()
             skema_klien_bersih = str(skema_klien).strip()
             
-            # 2. Ambil tahun dari tanggal
+            # Hitung tahun
             df['year'] = pd.to_datetime(df['created_at']).dt.year
             
-            # 3. Hitung baris yang TAHUN dan SKEMA-nya sama (Casing-sensitive)
-            count_skema_ini = len(df[(df['year'] == tahun_pilih) & (df['skema'] == skema_klien_bersih)])
+            # Hitung jumlah kontrak dari tahun dan Skema yang sama
+            count_skema_ini = len(df[(df['year'] == tahun_pilih) & (df['Skema'] == skema_klien_bersih)])
             
             return count_skema_ini + 1
             
         return 1
     except Exception as e:
-        # TAMPILKAN ERROR MERAH JIKA GAGAL (Jangan sembunyikan jadi angka 1)
         st.error(f"⚠️ Error sistem perhitungan nomor: {e}")
         return 1
 
