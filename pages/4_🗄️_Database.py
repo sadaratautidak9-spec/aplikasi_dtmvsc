@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
-from supabase import create_client, Client
+from supabase import create_client
 import requests
+import datetime
 
 # --- 1. KONFIGURASI SUPABASE ---
-# GANTI DENGAN URL DAN KEY MILIK ANDA!
 SUPABASE_URL = "https://ehfpmlwmdnjtxrfqdgkc.supabase.co" 
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoZnBtbHdtZG5qdHhyZnFkZ2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDc1NjMsImV4cCI6MjA5MDA4MzU2M30.LPiPaAIm2MhuywLnmSTegWO0-1gcPuVww8abFhTAin8" 
 
@@ -16,46 +16,52 @@ supabase = init_connection()
 
 st.set_page_config(page_title="Database Kontrak", page_icon="🗄️", layout="wide")
 
-# --- SUNTIKAN CSS DESAIN GLOBAL ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined');
-
-    html, body, [class*="css"] {
-        font-family: 'Titillium Web', sans-serif !important;
-    }
-    
-    /* Paksa Sidebar berwarna Biru Tua */
-    [data-testid="stSidebar"] {
-        background-color: #1e3a8a !important;
-    }
-    
-    /* Paksa tulisan di Sidebar berwarna Putih */
-    [data-testid="stSidebar"] * {
-        color: white !important;
-    }
+    html, body, [class*="css"] { font-family: 'Titillium Web', sans-serif !important; }
+    [data-testid="stSidebar"] { background-color: #1e3a8a !important; }
+    [data-testid="stSidebar"] * { color: white !important; }
 </style>
 """, unsafe_allow_html=True)
 st.title("🗄️ Manajemen Database Kontrak")
 
-# --- 2. FUNGSI TARIK DATA ---
+# --- 2. FUNGSI TARIK DATA (METODE JOIN) ---
+# Di sinilah letak Arsitektur Pintarnya. Kita gabung data kontrak dan sertifikasinya.
 def load_data():
-    # Tarik data dan urutkan dari yang terbaru (ID terbesar)
-    response = supabase.table('data_kontrak').select("*").order("id", desc=True).execute()
-    return pd.DataFrame(response.data)
+    # 1. Ambil data kontrak
+    res_kontrak = supabase.table('data_kontrak').select("*").order("id", desc=True).execute()
+    df_kontrak = pd.DataFrame(res_kontrak.data)
+    
+    if df_kontrak.empty:
+        return pd.DataFrame()
+
+    # 2. Ambil data sertifikasi (untuk numpang lihat Tanggal Terbit, Resi, dll)
+    res_sertif = supabase.table('data_sertifikasi').select("id_kontrak, no_sertifikat, tgl_terbit, tgl_survailen, status").execute()
+    df_sertif = pd.DataFrame(res_sertif.data)
+    
+    # 3. GABUNGKAN (Merge). 
+    # Sekarang Menu Database bisa melihat 'tgl_terbit' meskipun data aslinya ada di tabel sebelah!
+    if not df_sertif.empty:
+        df_final = pd.merge(df_kontrak, df_sertif, left_on='id', right_on='id_kontrak', how='left')
+    else:
+        df_final = df_kontrak
+        df_final['tgl_terbit'] = None
+        df_final['no_sertifikat'] = None
+        
+    return df_final
 
 df = load_data()
 
 if df.empty:
     st.info("Database masih kosong.")
-    st.stop() # Berhenti di sini kalau kosong
+    st.stop()
 
 # --- 3. FITUR PENCARIAN (SEARCH) ---
 st.subheader("🔍 Cari & Lihat Data")
-kata_kunci = st.text_input("Ketik pencarian (Nama PT, Marketing, Status, dll):", "")
+kata_kunci = st.text_input("Ketik pencarian (Nama PT, Marketing, dll):", "")
 
-# Logika Filter Pencarian
 if kata_kunci:
     mask = df.astype(str).apply(lambda x: x.str.contains(kata_kunci, case=False)).any(axis=1)
     df_tampil = df[mask]
@@ -63,28 +69,18 @@ else:
     df_tampil = df
 
 st.dataframe(df_tampil, use_container_width=True)
-st.caption(f"Menampilkan {len(df_tampil)} dari total {len(df)} data kontrak.")
-
 st.divider()
 
 # --- 4. FITUR UPDATE SEMUA KOLOM ---
 st.subheader("✏️ Edit / Lengkapi Data")
 
-# Bikin opsi pilihan "ID - Nama PT" biar gampang nyarinya
 df['label_pilihan'] = df['id'].astype(str) + " - " + df['nama_pt'].astype(str)
 pilihan_label = st.selectbox("Pilih Data yang akan diedit:", df['label_pilihan'].tolist())
-
-# Ekstrak angka ID dari pilihan (mengambil angka sebelum tanda strip)
 pilihan_id = int(pilihan_label.split(" - ")[0])
-
-# Ambil data lama berdasarkan ID terpilih
 data_terpilih = df[df['id'] == pilihan_id].iloc[0].fillna('')
 
-# --- FUNGSI BANTUAN UNTUK DATE_INPUT ---
 def set_default_date(tgl_string):
-    import datetime 
-    if not tgl_string or str(tgl_string).strip() in ['-', '']:
-        return None
+    if not tgl_string or str(tgl_string).strip() in ['-', 'None', 'nan', '']: return None
     try:
         return datetime.datetime.strptime(str(tgl_string).strip(), '%Y-%m-%d').date()
     except ValueError:
@@ -135,86 +131,75 @@ with st.form("form_update_lengkap"):
     with tab4:
         col7, col8 = st.columns(2)
         with col7:
-            terbit_sertifikat = st.date_input("Terbit Sertifikat", value=set_default_date(data_terpilih.get('Terbit Sertifikat', '')))
+            # ---> KITA BACA DARI 'tgl_terbit' MILIK TABEL SEBELAH (HASIL MERGE/JOIN TADI)
+            terbit_sertifikat_view = st.date_input("Tanggal Terbit Sertifikat", value=set_default_date(data_terpilih.get('tgl_terbit', '')))
             tgl_kirim_sertifikat = st.date_input("Tanggal Pengiriman Sertifikat", value=set_default_date(data_terpilih.get('Tanggal Pengiriman Sertifikat', '')))
         with col8:
+            no_sertif_view = st.text_input("Nomor Sertifikat", value=str(data_terpilih.get('no_sertifikat', '')))
             no_resi = st.text_input("No Resi Sertifikat", value=str(data_terpilih.get('No resi Sertifikat', '')))
 
     st.markdown("<br>", unsafe_allow_html=True)
     submit_update = st.form_submit_button("💾 SIMPAN SEMUA PERUBAHAN", use_container_width=True)
     
     if submit_update:
-        # FUNGSI PENTING: Merubah keluaran kalender menjadi Teks Standar YYYY-MM-DD
-        def proses_tanggal(nilai_kalender):
-            return nilai_kalender.strftime('%Y-%m-%d') if nilai_kalender is not None else None
+        def proses_tgl(kalender): return kalender.strftime('%Y-%m-%d') if kalender else None
+        def bersih(nilai): return None if nilai == "" else nilai
 
-        def bersihkan_data(nilai):
-            return None if nilai == "" else nilai
-
-        # Kumpulkan semua data, tanggal wajib lewat proses_tanggal()
-        data_update = {
-            "nama_pt": bersihkan_data(nama_pt),
-            "PIC": bersihkan_data(pic),
-            "No Hp PIC": bersihkan_data(no_hp_pic),
-            "Alamat lengkap": bersihkan_data(alamat),
-            "Lokasi": bersihkan_data(lokasi),
-            "Tenggal Kontrak": proses_tanggal(tgl_kontrak),   # <-- TANGGAL
-            "Skema": bersihkan_data(skema),
-            "Ruang Lingkup": bersihkan_data(ruang_lingkup),
-            "Harga Sertifikasi Awal": bersihkan_data(harga),
-            "Marketing": bersihkan_data(marketing),
-            "No Wa Marketing": bersihkan_data(no_wa_marketing),
-            "Status": bersihkan_data(status),
-            "Pembayaran Awal": bersihkan_data(pem_awal),
-            "Pembayaran Survailen 1": bersihkan_data(pem_surv1),
-            "Pembayaran Survailen 2": bersihkan_data(pem_surv2),
-            "Kajian": bersihkan_data(kajian),
-            "Surat Tugas": bersihkan_data(surat_tugas),
-            "Tanggal Audit": proses_tanggal(tgl_audit),       # <-- TANGGAL
-            "Pelaporan Audit": bersihkan_data(pelaporan),
-            "Lead Auditor": bersihkan_data(lead_auditor),
-            "Auditor": bersihkan_data(auditor),
-            "Observer": bersihkan_data(observer),
-            "Terbit Sertifikat": proses_tanggal(terbit_sertifikat), # <-- TANGGAL
-            "Tanggal Pengiriman Sertifikat": proses_tanggal(tgl_kirim_sertifikat), # <-- TANGGAL
-            "No resi Sertifikat": bersihkan_data(no_resi)
+        # 1. SIAPKAN DATA UNTUK TABEL KONTRAK
+        data_update_kontrak = {
+            "nama_pt": bersih(nama_pt), "PIC": bersih(pic), "No Hp PIC": bersih(no_hp_pic),
+            "Alamat lengkap": bersih(alamat), "Lokasi": bersih(lokasi),
+            "Tenggal Kontrak": proses_tgl(tgl_kontrak), "Skema": bersih(skema), "Ruang Lingkup": bersih(ruang_lingkup),
+            "Harga Sertifikasi Awal": bersih(harga), "Marketing": bersih(marketing), "No Wa Marketing": bersih(no_wa_marketing),
+            "Status": bersih(status), "Pembayaran Awal": bersih(pem_awal), "Pembayaran Survailen 1": bersih(pem_surv1),
+            "Pembayaran Survailen 2": bersih(pem_surv2), "Kajian": bersih(kajian), "Surat Tugas": bersih(surat_tugas),
+            "Tanggal Audit": proses_tgl(tgl_audit), "Pelaporan Audit": bersih(pelaporan),
+            "Lead Auditor": bersih(lead_auditor), "Auditor": bersih(auditor), "Observer": bersih(observer),
+            "Tanggal Pengiriman Sertifikat": proses_tgl(tgl_kirim_sertifikat), "No resi Sertifikat": bersih(no_resi)
         }
         
         try:
-            # SINKRONISASI TABEL SERTIFIKASI (Jika operator mengganti tanggal terbit disini)
-            tgl_terbit_str = proses_tanggal(terbit_sertifikat)
-            if tgl_terbit_str:
-                cek_sertif = supabase.table('data_sertifikasi').select('id').eq('id_kontrak', pilihan_id).execute()
-                if cek_sertif.data:
-                    supabase.table('data_sertifikasi').update({'tgl_terbit': tgl_terbit_str}).eq('id_kontrak', pilihan_id).execute()
+            # EKSEKUSI 1: UPDATE KE TABEL KONTRAK
+            supabase.table('data_kontrak').update(data_update_kontrak).eq('id', pilihan_id).execute()
 
-            # JALUR n8n (Menyuruh n8n update data_kontrak dan Google Sheets)
+            # EKSEKUSI 2: UPDATE KE TABEL SERTIFIKASI (INI YANG BIKIN JADI SELALU SINKRON!)
+            tgl_terbit_str = proses_tgl(terbit_sertifikat_view)
+            
+            cek_sertif = supabase.table('data_sertifikasi').select('id').eq('id_kontrak', pilihan_id).execute()
+            if cek_sertif.data:
+                # Jika dia sudah dirilis sertifikatnya, kita update nomor & tanggalnya
+                supabase.table('data_sertifikasi').update({
+                    'tgl_terbit': tgl_terbit_str,
+                    'no_sertifikat': bersih(no_sertif_view)
+                }).eq('id_kontrak', pilihan_id).execute()
+
+            # (OPSIONAL): Jika Anda masih menggunakan n8n untuk Spreadsheet
             URL_WEBHOOK_UPDATE = "https://n8n-ihbsb8xa9qan.jkt4.sumopod.my.id/webhook-test/b62cc644-5ee3-4584-a392-72177502ee19"
-            
-            data_n8n = data_update.copy()
+            data_n8n = data_update_kontrak.copy()
             data_n8n['id'] = pilihan_id 
+            data_n8n['tgl_terbit'] = tgl_terbit_str # Informasikan n8n agar Spreadsheet-nya juga tahu
             
-            response = requests.post(URL_WEBHOOK_UPDATE, json=data_n8n)
+            requests.post(URL_WEBHOOK_UPDATE, json=data_n8n)
             
-            if response.status_code == 200:
-                st.success("✅ Data berhasil disimpan! Laporan terkirim ke n8n untuk Spreadsheet.")
-                st.rerun()
-            else:
-                st.error("Gagal mengirim ke n8n. Cek apakah n8n sedang berjalan.")
+            st.success("✅ Seluruh data di Database dan Status Klien berhasil tersinkronisasi!")
+            st.rerun()
+            
         except Exception as e:
             st.error(f"Terjadi kesalahan: {e}")
 
 st.divider()
 
-# --- 5. FITUR HAPUS (DENGAN PENGAMAN) ---
+# --- 5. FITUR HAPUS ---
 with st.expander("🗑️ Hapus Data (Danger Zone)"):
     with st.form("form_delete"):
-        st.warning("⚠️ Data yang dihapus tidak bisa dikembalikan!")
+        st.warning("⚠️ Menghapus ini akan menghapus Klien dari SEMUA Database!")
         hapus_label = st.selectbox("Pilih Data yang akan DIHAPUS:", df['label_pilihan'].tolist())
-        hapus_id = int(hapus_label.split(" - ")[0])
-        
         submit_delete = st.form_submit_button("Hapus Permanen")
         if submit_delete:
+            hapus_id = int(hapus_label.split(" - ")[0])
+            # Hapus dari tabel sertifikat dulu agar tidak jadi hantu
+            supabase.table('data_sertifikasi').delete().eq('id_kontrak', hapus_id).execute()
+            # Baru hapus dari tabel kontrak
             supabase.table('data_kontrak').delete().eq('id', hapus_id).execute()
-            st.error(f"🗑️ Data PT tersebut berhasil dihapus!")
+            st.error(f"🗑️ Data PT berhasil dihapus secara permanen!")
             st.rerun()
