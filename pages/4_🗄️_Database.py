@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
+import requests
 
 # --- 1. KONFIGURASI SUPABASE ---
 # GANTI DENGAN URL DAN KEY MILIK ANDA!
@@ -14,6 +15,7 @@ def init_connection():
 supabase = init_connection()
 
 st.set_page_config(page_title="Database Kontrak", page_icon="🗄️", layout="wide")
+
 # --- SUNTIKAN CSS DESAIN GLOBAL ---
 st.markdown("""
 <style>
@@ -55,7 +57,6 @@ kata_kunci = st.text_input("Ketik pencarian (Nama PT, Marketing, Status, dll):",
 
 # Logika Filter Pencarian
 if kata_kunci:
-    # Mencari kata kunci di SEMUA kolom
     mask = df.astype(str).apply(lambda x: x.str.contains(kata_kunci, case=False)).any(axis=1)
     df_tampil = df[mask]
 else:
@@ -79,10 +80,19 @@ pilihan_id = int(pilihan_label.split(" - ")[0])
 # Ambil data lama berdasarkan ID terpilih
 data_terpilih = df[df['id'] == pilihan_id].iloc[0].fillna('')
 
+# --- FUNGSI BANTUAN UNTUK DATE_INPUT ---
+def set_default_date(tgl_string):
+    import datetime 
+    if not tgl_string or str(tgl_string).strip() in ['-', '']:
+        return None
+    try:
+        return datetime.datetime.strptime(str(tgl_string).strip(), '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
 with st.form("form_update_lengkap"):
     st.info(f"🏢 Sedang mengedit: **{data_terpilih.get('nama_pt', '')}**")
     
-    # MENGGUNAKAN TABS AGAR RAPI
     tab1, tab2, tab3, tab4 = st.tabs(["🏢 Info Perusahaan", "📝 Detail Kontrak & Pembayaran", "🕵️ Tim & Jadwal Audit", "📜 Sertifikat"])
     
     with tab1:
@@ -98,7 +108,7 @@ with st.form("form_update_lengkap"):
     with tab2:
         col3, col4 = st.columns(2)
         with col3:
-            tgl_kontrak = st.text_input("Tanggal Kontrak", value=str(data_terpilih.get('Tenggal Kontrak', '')))
+            tgl_kontrak = st.date_input("Tanggal Kontrak", value=set_default_date(data_terpilih.get('Tenggal Kontrak', '')))
             skema = st.text_input("Skema", value=str(data_terpilih.get('Skema', '')))
             ruang_lingkup = st.text_area("Ruang Lingkup", value=str(data_terpilih.get('Ruang Lingkup', '')))
             harga = st.text_input("Harga Sertifikasi Awal", value=str(data_terpilih.get('Harga Sertifikasi Awal', '')))
@@ -115,7 +125,7 @@ with st.form("form_update_lengkap"):
         with col5:
             kajian = st.text_input("Kajian", value=str(data_terpilih.get('Kajian', '')))
             surat_tugas = st.text_input("Surat Tugas", value=str(data_terpilih.get('Surat Tugas', '')))
-            tgl_audit = st.text_input("Tanggal Audit", value=str(data_terpilih.get('Tanggal Audit', '')))
+            tgl_audit = st.date_input("Tanggal Audit", value=set_default_date(data_terpilih.get('Tanggal Audit', '')))
             pelaporan = st.text_input("Pelaporan Audit", value=str(data_terpilih.get('Pelaporan Audit', '')))
         with col6:
             lead_auditor = st.text_input("Lead Auditor", value=str(data_terpilih.get('Lead Auditor', '')))
@@ -125,8 +135,8 @@ with st.form("form_update_lengkap"):
     with tab4:
         col7, col8 = st.columns(2)
         with col7:
-            terbit_sertifikat = st.text_input("Terbit Sertifikat", value=str(data_terpilih.get('Terbit Sertifikat', '')))
-            tgl_kirim_sertifikat = st.text_input("Tanggal Pengiriman Sertifikat", value=str(data_terpilih.get('Tanggal Pengiriman Sertifikat', '')))
+            terbit_sertifikat = st.date_input("Terbit Sertifikat", value=set_default_date(data_terpilih.get('Terbit Sertifikat', '')))
+            tgl_kirim_sertifikat = st.date_input("Tanggal Pengiriman Sertifikat", value=set_default_date(data_terpilih.get('Tanggal Pengiriman Sertifikat', '')))
         with col8:
             no_resi = st.text_input("No Resi Sertifikat", value=str(data_terpilih.get('No resi Sertifikat', '')))
 
@@ -134,18 +144,21 @@ with st.form("form_update_lengkap"):
     submit_update = st.form_submit_button("💾 SIMPAN SEMUA PERUBAHAN", use_container_width=True)
     
     if submit_update:
-        # Fungsi kecil untuk mengubah teks kosong ("") menjadi None (Null) agar SQL tidak error
+        # FUNGSI PENTING: Merubah keluaran kalender menjadi Teks Standar YYYY-MM-DD
+        def proses_tanggal(nilai_kalender):
+            return nilai_kalender.strftime('%Y-%m-%d') if nilai_kalender is not None else None
+
         def bersihkan_data(nilai):
             return None if nilai == "" else nilai
 
-        # Kumpulkan semua data dari form (NAMA KOLOM SUDAH DISESUAIKAN DENGAN SCREENSHOT)
+        # Kumpulkan semua data, tanggal wajib lewat proses_tanggal()
         data_update = {
             "nama_pt": bersihkan_data(nama_pt),
             "PIC": bersihkan_data(pic),
             "No Hp PIC": bersihkan_data(no_hp_pic),
-            "Alamat lengkap": bersihkan_data(alamat),         # <-- Huruf 'l' kecil
+            "Alamat lengkap": bersihkan_data(alamat),
             "Lokasi": bersihkan_data(lokasi),
-            "Tenggal Kontrak": bersihkan_data(tgl_kontrak),   # <-- Typo 'e' disesuaikan
+            "Tenggal Kontrak": proses_tanggal(tgl_kontrak),   # <-- TANGGAL
             "Skema": bersihkan_data(skema),
             "Ruang Lingkup": bersihkan_data(ruang_lingkup),
             "Harga Sertifikasi Awal": bersihkan_data(harga),
@@ -157,32 +170,34 @@ with st.form("form_update_lengkap"):
             "Pembayaran Survailen 2": bersihkan_data(pem_surv2),
             "Kajian": bersihkan_data(kajian),
             "Surat Tugas": bersihkan_data(surat_tugas),
-            "Tanggal Audit": bersihkan_data(tgl_audit),
+            "Tanggal Audit": proses_tanggal(tgl_audit),       # <-- TANGGAL
             "Pelaporan Audit": bersihkan_data(pelaporan),
             "Lead Auditor": bersihkan_data(lead_auditor),
             "Auditor": bersihkan_data(auditor),
             "Observer": bersihkan_data(observer),
-            "Terbit Sertifikat": bersihkan_data(terbit_sertifikat),
-            "Tanggal Pengiriman Sertifikat": bersihkan_data(tgl_kirim_sertifikat),
-            "No resi Sertifikat": bersihkan_data(no_resi)     # <-- Huruf 'r' kecil
+            "Terbit Sertifikat": proses_tanggal(terbit_sertifikat), # <-- TANGGAL
+            "Tanggal Pengiriman Sertifikat": proses_tanggal(tgl_kirim_sertifikat), # <-- TANGGAL
+            "No resi Sertifikat": bersihkan_data(no_resi)
         }
         
-        # --- JALUR BARU: PYTHON MELAPOR KE n8n ---
-        import requests
-        
-        # GANTI URL INI DENGAN TEST URL DARI WEBHOOK1 (n8n) ANDA!
-        URL_WEBHOOK_UPDATE = "https://n8n-ihbsb8xa9qan.jkt4.sumopod.my.id/webhook-test/b62cc644-5ee3-4584-a392-72177502ee19"
-        
-        # Kita gabungkan 'id' agar n8n tahu baris mana yang harus diubah
-        data_n8n = data_update.copy()
-        data_n8n['id'] = pilihan_id 
-        
         try:
-            # Tembak datanya ke n8n
+            # SINKRONISASI TABEL SERTIFIKASI (Jika operator mengganti tanggal terbit disini)
+            tgl_terbit_str = proses_tanggal(terbit_sertifikat)
+            if tgl_terbit_str:
+                cek_sertif = supabase.table('data_sertifikasi').select('id').eq('id_kontrak', pilihan_id).execute()
+                if cek_sertif.data:
+                    supabase.table('data_sertifikasi').update({'tgl_terbit': tgl_terbit_str}).eq('id_kontrak', pilihan_id).execute()
+
+            # JALUR n8n (Menyuruh n8n update data_kontrak dan Google Sheets)
+            URL_WEBHOOK_UPDATE = "https://n8n-ihbsb8xa9qan.jkt4.sumopod.my.id/webhook-test/b62cc644-5ee3-4584-a392-72177502ee19"
+            
+            data_n8n = data_update.copy()
+            data_n8n['id'] = pilihan_id 
+            
             response = requests.post(URL_WEBHOOK_UPDATE, json=data_n8n)
             
             if response.status_code == 200:
-                st.success("✅ Laporan perubahan berhasil dikirim ke n8n!")
+                st.success("✅ Data berhasil disimpan! Laporan terkirim ke n8n untuk Spreadsheet.")
                 st.rerun()
             else:
                 st.error("Gagal mengirim ke n8n. Cek apakah n8n sedang berjalan.")
