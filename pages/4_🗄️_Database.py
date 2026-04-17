@@ -171,7 +171,7 @@ with st.form("form_update_lengkap"):
         import requests
         
         # GANTI URL INI DENGAN TEST URL DARI WEBHOOK1 (n8n) ANDA!
-        URL_WEBHOOK_UPDATE = "http://localhost:5678/webhook/eaab5868-97ca-4de4-a4aa-562ee23dc2d7"
+        URL_WEBHOOK_UPDATE = "https://n8n-ihbsb8xa9qan.jkt4.sumopod.my.id/webhook-test/b62cc644-5ee3-4584-a392-72177502ee19"
         
         # Kita gabungkan 'id' agar n8n tahu baris mana yang harus diubah
         data_n8n = data_update.copy()
