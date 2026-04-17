@@ -36,6 +36,17 @@ def init_connection():
 supabase = init_connection()
 
 # --- FUNGSI TARIK DATA ---
+def format_tanggal_indo(tgl_str):
+    if not tgl_str or str(tgl_str).strip() in ['-', '']:
+        return '-'
+    try:
+        # Coba terjemahkan format YYYY-MM-DD dari database
+        dt = datetime.datetime.strptime(str(tgl_str).strip(), '%Y-%m-%d')
+        bulan_indo = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+        return f"{dt.day} {bulan_indo[dt.month]} {dt.year}"
+    except ValueError:
+        # Jika format bukan YYYY-MM-DD (Misal diketik manual), tampilkan teks aslinya
+        return tgl_str
 def load_data_kontrak():
     res = supabase.table('data_kontrak').select("*").execute()
     return res.data
@@ -82,8 +93,8 @@ if st.session_state.detail_klien is not None:
     with c2:
         st.markdown("<h5 style='color: #1e3a8a;'>🏆 Informasi Sertifikasi</h5>", unsafe_allow_html=True)
         st.write(f"**No Sertifikat:** {row.get('no_sertifikat', '-')}")
-        st.write(f"**Tanggal Terbit:** {row.get('tgl_terbit', '-')}")
-        st.write(f"**Jadwal Survailen:** {row.get('tgl_survailen', '-')}")
+        st.write(f"**Tanggal Terbit:** {format_tanggal_indo(row.get('tgl_terbit', '-'))}")
+        st.write(f"**Jadwal Survailen:** {format_tanggal_indo(row.get('tgl_survailen', '-'))}")
         
         # Menampilkan Riwayat Tanggal (Hanya muncul jika datanya ada)
         if row.get('tgl_pembekuan'):
