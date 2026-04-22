@@ -15,7 +15,7 @@ import requests
 from supabase import create_client
 
 # --- KONFIGURASI WEBHOOK n8n & SUPABASE ---
-N8N_WEBHOOK_URL = "https://n8n-ihbsb8xa9qan.jkt4.sumopod.my.id/webhook-test/0efd14de-28cc-4582-ac29-dc4cf98bcfda"
+N8N_WEBHOOK_URL = "https://n8n-ihbsb8xa9qan.jkt4.sumopod.my.id/webhook/0efd14de-28cc-4582-ac29-dc4cf98bcfda"
 
 SUPABASE_URL = "https://ehfpmlwmdnjtxrfqdgkc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoZnBtbHdtZG5qdHhyZnFkZ2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDc1NjMsImV4cCI6MjA5MDA4MzU2M30.LPiPaAIm2MhuywLnmSTegWO0-1gcPuVww8abFhTAin8"
