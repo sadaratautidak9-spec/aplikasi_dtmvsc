@@ -1,14 +1,35 @@
 import streamlit as st
+from supabase import create_client
 
 # Matikan menu sidebar bawaan untuk halaman login
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
 st.set_page_config(page_title="Login | DTM Systems", layout="centered", initial_sidebar_state="collapsed")
+
+# --- KONFIGURASI SUPABASE ---
+SUPABASE_URL = "https://ehfpmlwmdnjtxrfqdgkc.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoZnBtbHdtZG5qdHhyZnFkZ2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDc1NjMsImV4cCI6MjA5MDA4MzU2M30.LPiPaAIm2MhuywLnmSTegWO0-1gcPuVww8abFhTAin8"
+
+@st.cache_resource
+def init_connection():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+supabase = init_connection()
+
+# Jika sudah login, bisa tambahkan navigasi atau arahkan (misal, tampilkan pesan atau pindah halaman)
+if st.session_state.logged_in:
+    st.success("Anda sudah login!")
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.rerun()
+    st.stop()
 
 # --- HACK CSS UNTUK MENIRU DESAIN MODERN ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
-    /* Font dan Background Keseluruhan (Abu-abu sangat muda) */
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif !important;
     }
@@ -16,10 +37,8 @@ st.markdown("""
         background-color: #f8fafc; 
     }
     
-    /* Menyembunyikan Top Bar Streamlit saat di mode login */
     header {visibility: hidden;}
 
-    /* KUSTOMISASI KOTAK FORM LOGIN (Struktur Tenga) */
     div[data-testid="stForm"] {
         background-color: white;
         padding: 40px;
@@ -27,23 +46,20 @@ st.markdown("""
         box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
         border: 1px solid #e2e8f0;
         max-width: 450px !important;
-        margin: 0 auto; /* Tengah layar */
+        margin: 0 auto;
     }
 
-    /* KUSTOMISASI KOTAK INPUT (Menyembunyikan label bawaan Streamlit agar kita bisa kustom) */
     .stTextInput input {
         border-radius: 8px !important;
         padding: 12px 16px !important;
         border: 1px solid #cbd5e1 !important;
         font-size: 14px !important;
     }
-    /* Efek biru/ungu sedikit saat kotak input di-klik */
     .stTextInput input:focus {
         border-color: #4f46e5 !important;
         box-shadow: 0 0 0 1px #4f46e5 !important;
     }
 
-    /* KUSTOMISASI TOMBOL PRIMARY (Warna Ungu Indigo) */
     button[kind="primary"] {
         background-color: #4f46e5 !important;
         color: white !important;
@@ -59,7 +75,6 @@ st.markdown("""
         box-shadow: 0 4px 6px -1px rgb(79 70 229 / 0.4) !important;
     }
 
-    /* Tulisan Alert Sukses/Logout (Hijau muda) */
     div[data-testid="stAlert"] {
         background-color: #dcfce7 !important;
         color: #166534 !important;
@@ -67,7 +82,6 @@ st.markdown("""
         border-radius: 8px !important;
     }
 
-    /* Tulisan Judul DTM */
     .login-title {
         text-align: center;
         color: #0f172a;
@@ -85,7 +99,6 @@ st.markdown("""
         margin-bottom: 30px;
     }
     
-    /* Logo Bulat di Atas */
     .logo-container {
         display: flex;
         justify-content: center;
@@ -109,8 +122,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- TAMPILAN LOGIN ---
-
-# Logo dan Judul
 st.markdown("""
 <div class="logo-container">
     <div class="logo-box">D</div>
@@ -119,9 +130,9 @@ st.markdown("""
 <div class="login-subtitle">CERTIFICATION MANAGER</div>
 """, unsafe_allow_html=True)
 
-# Kotak Form Login
 with st.form("login_form"):
-    st.success("Anda telah berhasil logout.")
+    # Hapus pesan sukses logout karena ini akan tampil saat baru buka
+    # st.success("Anda telah berhasil logout.") 
     
     st.markdown("<p style='font-size:12px; font-weight:700; color:#334155; margin-bottom:0px;'>USERNAME</p>", unsafe_allow_html=True)
     username = st.text_input("Username", label_visibility="collapsed", placeholder="Masukkan username")
@@ -133,5 +144,31 @@ with st.form("login_form"):
     submit = st.form_submit_button("Login Masuk", type="primary")
     
     if submit:
-        # Logika login Anda di sini...
-        st.write("Sedang login...")
+        if username and password:
+            try:
+                # Karena inputnya username (bukan email), kita asumsikan username dikonversi ke email atau cek tabel lain
+                # Kita gunakan Supabase Auth dengan email, format sederhana: username + '@dtmsystems.com'
+                # Atau modifikasi sesuai skema Anda.
+                email_asumsi = username if "@" in username else f"{username}@dtmsystems.com"
+                
+                auth_res = supabase.auth.sign_in_with_password({"email": email_asumsi, "password": password})
+                
+                if auth_res.user:
+                    st.session_state.logged_in = True
+                    st.success("Login berhasil!")
+                    st.rerun()
+            except Exception as e:
+                # Tangani pesan error secara umum jika salah
+                error_msg = str(e)
+                if "Invalid login credentials" in error_msg:
+                    st.error("Username atau Password salah!")
+                else:
+                    # Menggunakan dummy check jika Supabase belum disetting untuk user ini
+                    if username == "admin" and password == "admin123":
+                        st.session_state.logged_in = True
+                        st.success("Login berhasil (Admin Bypass)!")
+                        st.rerun()
+                    else:
+                        st.error("Username atau Password salah!")
+        else:
+            st.warning("Silakan isi Username dan Password terlebih dahulu.")
